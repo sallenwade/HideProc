@@ -2,10 +2,12 @@
 #ifdef WIN10
 #define NAMEOFFSET 0x5a8
 #define LINKOFFSET 0x448
+#define PIDOFFSET 0x440
 #endif
 #ifdef WIN732
 #define NAMEOFFSET 0x16c
 #define LINKOFFSET 0xb8
+#define PIDOFFSET 0xb4
 #endif
 #include <ntifs.h>
 
@@ -20,7 +22,7 @@ NTSTATUS HidProcByPid1(ULONG ulPid) {
 	pNextlist = pListheader->Flink;
 	while (pNextlist != pListheader) {
 		pEprocess = (DWORD_PTR)((DWORD_PTR)pNextlist - LINKOFFSET);
-		ppid = *(ULONG*)(pEprocess + 0x440);
+		ppid = *(ULONG*)(pEprocess + PIDOFFSET);
 		DbgPrint("PID:%d, ProName:%s\n", ppid, (UCHAR*)(pEprocess + NAMEOFFSET));
 
 		if (ppid == ulPid) {
@@ -33,9 +35,9 @@ NTSTATUS HidProcByPid1(ULONG ulPid) {
 	}
 	return STATUS_SUCCESS;
 }
-
-NTSTATUS HidProcByPid2(CHAR* ProcName) {
-	KdBreakPoint();
+DWORD_PTR g_kpcr = 0;
+NTSTATUS HidProcByName(CHAR* ProcName) {
+	//KdBreakPoint();
 	DWORD_PTR pEprocess = 0;
 	PLIST_ENTRY pListheader = NULL;
 	PLIST_ENTRY pNextlist = NULL;
@@ -44,6 +46,8 @@ NTSTATUS HidProcByPid2(CHAR* ProcName) {
 	_asm {
 		push eax
 		push ebx
+		mov eax,fs:[0x1c]
+		mov g_kpcr,eax
 		mov ebx, fs: [0x124]   //CurrentThread -- KTHREAD
 		mov eax, [ebx + 0x150]
 		mov pEprocess, eax
@@ -58,7 +62,7 @@ NTSTATUS HidProcByPid2(CHAR* ProcName) {
 	pNextlist = pListheader->Flink;
 	while (pNextlist != pListheader) {
 		pEprocess = (DWORD_PTR)((DWORD_PTR)pNextlist - LINKOFFSET);
-		ppid = *(ULONG*)(pEprocess + 0x440);
+		ppid = *(ULONG*)(pEprocess + PIDOFFSET);
 		DbgPrint("PID:%d, ProName:%s\n", ppid, (UCHAR*)(pEprocess + NAMEOFFSET));
 		ListProcName = (PUCHAR)(pEprocess + NAMEOFFSET);
 		RtlInitAnsiString(&listStr, ListProcName);
